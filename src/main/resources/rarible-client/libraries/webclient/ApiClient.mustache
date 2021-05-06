@@ -3,6 +3,8 @@ package {{invokerPackage}};
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.fasterxml.jackson.module.kotlin.KotlinModule;
+import com.rarible.core.client.WebClientHelper;
 {{#openApiNullable}}
 import org.openapitools.jackson.nullable.JsonNullableModule;
 {{/openApiNullable}}
@@ -101,12 +103,12 @@ public class ApiClient{{#jsr310}} extends JavaTimeFormatter{{/jsr310}} {
 
     private Map<String, Authentication> authentications;
 
-
     public ApiClient() {
         this.dateFormat = createDefaultDateFormat();
         ObjectMapper mapper = new ObjectMapper();
         mapper.setDateFormat(dateFormat);
         mapper.registerModule(new JavaTimeModule());
+        mapper.registerModule(new KotlinModule());
         mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         {{#openApiNullable}}
         JsonNullableModule jnm = new JsonNullableModule();
@@ -115,6 +117,10 @@ public class ApiClient{{#jsr310}} extends JavaTimeFormatter{{/jsr310}} {
 
         this.webClient = buildWebClient(mapper);
         this.init();
+    }
+
+    public ApiClient(ObjectMapper mapper) {
+        this(buildWebClient(mapper.copy()), createDefaultDateFormat());
     }
 
     public ApiClient(ObjectMapper mapper, DateFormat format) {
@@ -131,7 +137,7 @@ public class ApiClient{{#jsr310}} extends JavaTimeFormatter{{/jsr310}} {
         this.init();
     }
 
-    public DateFormat createDefaultDateFormat() {
+    public static DateFormat createDefaultDateFormat() {
         DateFormat dateFormat = new RFC3339DateFormat();
         dateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
         return dateFormat;
@@ -539,8 +545,8 @@ public class ApiClient{{#jsr310}} extends JavaTimeFormatter{{/jsr310}} {
      * @return The response body in chosen type
      */
     public <T> Mono<T> invokeAPI(String path, HttpMethod method, Map<String, Object> pathParams, MultiValueMap<String, String> queryParams, Object body, HttpHeaders headerParams, MultiValueMap<String, String> cookieParams, MultiValueMap<String, Object> formParams, List<MediaType> accept, MediaType contentType, String[] authNames, ParameterizedTypeReference<T> returnType) throws RestClientException {
-        final WebClient.RequestBodySpec requestBuilder = prepareRequest(path, method, pathParams, queryParams, body, headerParams, cookieParams, formParams, accept, contentType, authNames);
-        return requestBuilder.retrieve().bodyToMono(returnType);
+        return prepareRequest(path, method, pathParams, queryParams, body, headerParams, cookieParams, formParams, accept, contentType, authNames)
+            .flatMap(it -> it.retrieve().bodyToMono(returnType));
     }
 
     /**
@@ -561,11 +567,11 @@ public class ApiClient{{#jsr310}} extends JavaTimeFormatter{{/jsr310}} {
      * @return The response body in chosen type
      */
     public <T> Flux<T> invokeFluxAPI(String path, HttpMethod method, Map<String, Object> pathParams, MultiValueMap<String, String> queryParams, Object body, HttpHeaders headerParams, MultiValueMap<String, String> cookieParams, MultiValueMap<String, Object> formParams, List<MediaType> accept, MediaType contentType, String[] authNames, ParameterizedTypeReference<T> returnType) throws RestClientException {
-        final WebClient.RequestBodySpec requestBuilder = prepareRequest(path, method, pathParams, queryParams, body, headerParams, cookieParams, formParams, accept, contentType, authNames);
-        return requestBuilder.retrieve().bodyToFlux(returnType);
+        return prepareRequest(path, method, pathParams, queryParams, body, headerParams, cookieParams, formParams, accept, contentType, authNames)
+            .flatMapMany(it -> it.retrieve().bodyToFlux(returnType));
     }
 
-    private WebClient.RequestBodySpec prepareRequest(String path, HttpMethod method, Map<String, Object> pathParams, MultiValueMap<String, String> queryParams, Object body, HttpHeaders headerParams, MultiValueMap<String, String> cookieParams, MultiValueMap<String, Object> formParams, List<MediaType> accept, MediaType contentType, String[] authNames) {
+    private Mono<WebClient.RequestBodySpec> prepareRequest(String path, HttpMethod method, Map<String, Object> pathParams, MultiValueMap<String, String> queryParams, Object body, HttpHeaders headerParams, MultiValueMap<String, String> cookieParams, MultiValueMap<String, Object> formParams, List<MediaType> accept, MediaType contentType, String[] authNames) {
         updateParamsForAuth(authNames, queryParams, headerParams, cookieParams);
 
         final UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(basePath).path(path);
@@ -587,7 +593,7 @@ public class ApiClient{{#jsr310}} extends JavaTimeFormatter{{/jsr310}} {
         addCookiesToRequest(defaultCookies, requestBuilder);
 
         requestBuilder.body(selectBody(body, formParams, contentType));
-        return requestBuilder;
+        return WebClientHelper.preprocess(requestBuilder);
     }
 
     /**
