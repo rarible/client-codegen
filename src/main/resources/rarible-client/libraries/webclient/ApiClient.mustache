@@ -102,11 +102,30 @@ public class ApiClient{{#jsr310}} extends JavaTimeFormatter{{/jsr310}} {
     private final DateFormat dateFormat;
 
     private Map<String, Authentication> authentications;
+    private ObjectMapper mapper;
 
     public ApiClient() {
-        this.dateFormat = createDefaultDateFormat();
+        this(createDefaultObjectMapper());
+    }
+
+    public ApiClient(ObjectMapper mapper) {
+        this(mapper, createDefaultDateFormat());
+    }
+
+    public ApiClient(ObjectMapper mapper, DateFormat format) {
+        this(null, mapper, format);
+    }
+
+    public ApiClient(WebClient webClient, ObjectMapper mapper, DateFormat format) {
+        this.mapper = mapper.copy();
+        this.dateFormat = format;
+        this.webClient = (webClient == null) ? buildWebClient(this.mapper) : webClient;
+        this.init();
+    }
+
+    public static ObjectMapper createDefaultObjectMapper() {
         ObjectMapper mapper = new ObjectMapper();
-        mapper.setDateFormat(dateFormat);
+        mapper.setDateFormat(createDefaultDateFormat());
         mapper.registerModule(new JavaTimeModule());
         mapper.registerModule(new KotlinModule());
         mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
@@ -114,27 +133,7 @@ public class ApiClient{{#jsr310}} extends JavaTimeFormatter{{/jsr310}} {
         JsonNullableModule jnm = new JsonNullableModule();
         mapper.registerModule(jnm);
         {{/openApiNullable}}
-
-        this.webClient = buildWebClient(mapper);
-        this.init();
-    }
-
-    public ApiClient(ObjectMapper mapper) {
-        this(buildWebClient(mapper.copy()), createDefaultDateFormat());
-    }
-
-    public ApiClient(ObjectMapper mapper, DateFormat format) {
-        this(buildWebClient(mapper.copy()), format);
-    }
-
-    public ApiClient(WebClient webClient, ObjectMapper mapper, DateFormat format) {
-        this(Optional.ofNullable(webClient).orElseGet(() ->buildWebClient(mapper.copy())), format);
-    }
-
-    private ApiClient(WebClient webClient, DateFormat format) {
-        this.webClient = webClient;
-        this.dateFormat = format;
-        this.init();
+        return mapper;
     }
 
     public static DateFormat createDefaultDateFormat() {
@@ -169,6 +168,12 @@ public class ApiClient{{#jsr310}} extends JavaTimeFormatter{{/jsr310}} {
         return webClient.build();
     }
 
+    /**
+    * Returns ObjectMapper, used by client
+    */
+    public ObjectMapper getObjectMapper() {
+        return mapper;
+    }
 
     /**
      * Get the current base path
