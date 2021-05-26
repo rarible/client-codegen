@@ -4,6 +4,7 @@ import {{invokerPackage}}.ApiClient;
 
 {{#imports}}import {{import}};
 {{/imports}}
+import com.rarible.protocol.client.exception.ProtocolApiResponseException;
 {{^fullJavaUtil}}
 
 import java.util.HashMap;
@@ -124,7 +125,25 @@ public class {{classname}} {
         String[] localVarAuthNames = new String[] { {{#authMethods}}"{{name}}"{{^-last}}, {{/-last}}{{/authMethods}} };
 
         {{#returnType}}ParameterizedTypeReference<{{#isArray}}{{{returnBaseType}}}{{/isArray}}{{^isArray}}{{{returnType}}}{{/isArray}}> localVarReturnType = new ParameterizedTypeReference<{{#isArray}}{{{returnBaseType}}}{{/isArray}}{{^isArray}}{{{returnType}}}{{/isArray}}>() {};{{/returnType}}{{^returnType}}ParameterizedTypeReference<Void> localVarReturnType = new ParameterizedTypeReference<Void>() {};{{/returnType}}
-        return apiClient.{{#isArray}}invokeFluxAPI{{/isArray}}{{^isArray}}invokeAPI{{/isArray}}("{{{path}}}", HttpMethod.{{httpMethod}}, pathParams, queryParams, postBody, headerParams, cookieParams, formParams, localVarAccept, localVarContentType, localVarAuthNames, localVarReturnType);
+        return apiClient.{{#isArray}}invokeFluxAPI{{/isArray}}{{^isArray}}invokeAPI{{/isArray}}("{{{path}}}", HttpMethod.{{httpMethod}}, pathParams, queryParams, postBody, headerParams, cookieParams, formParams, localVarAccept, localVarContentType, localVarAuthNames, localVarReturnType)
+                .onErrorResume(WebClientResponseException.class, e -> {
+                    Class dtoClass = null;
+                    int code = e.getStatusCode().value();
+                    {{#responses}}
+                    {{^is2xx}}
+                    if (code == {{code}}) dtoClass = {{dataType}}.class;
+                    {{/is2xx}}
+                    {{/responses}}
+                    if (dtoClass == null) throw e;
+
+                    Object error;
+                    try {
+                        error = apiClient.getObjectMapper().readValue(e.getResponseBodyAsByteArray(), dtoClass);
+                    } catch (Exception ex) {
+                        throw new RuntimeException("Failed to map error response to DTO class " + dtoClass, ex);
+                    }
+                    throw new ProtocolApiResponseException("Server returned code " + code + ", check responseObject for details", e, error);
+                });
     }
     {{/operation}}
 }
