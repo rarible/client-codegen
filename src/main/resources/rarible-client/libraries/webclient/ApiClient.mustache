@@ -30,6 +30,7 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
 import org.springframework.http.client.reactive.ClientHttpRequest;
+import org.springframework.boot.web.reactive.function.client.WebClientCustomizer;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.util.UriComponentsBuilder;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -105,21 +106,28 @@ public class ApiClient{{#jsr310}} extends JavaTimeFormatter{{/jsr310}} {
     private ObjectMapper mapper;
 
     public ApiClient() {
-        this(createDefaultObjectMapper());
+        this(null, createDefaultObjectMapper());
     }
 
-    public ApiClient(ObjectMapper mapper) {
-        this(mapper, createDefaultDateFormat());
+    public ApiClient(WebClientCustomizer webClientCustomizer) {
+        this(webClientCustomizer, createDefaultObjectMapper());
     }
 
-    public ApiClient(ObjectMapper mapper, DateFormat format) {
-        this(null, mapper, format);
+    public ApiClient(WebClientCustomizer webClientCustomizer, ObjectMapper mapper) {
+        this(webClientCustomizer, mapper, createDefaultDateFormat());
+    }
+
+    public ApiClient(WebClientCustomizer webClientCustomizer, ObjectMapper mapper, DateFormat format) {
+        this.mapper = mapper.copy();
+        this.dateFormat = format;
+        this.webClient = buildWebClient(webClientCustomizer);
+        this.init();
     }
 
     public ApiClient(WebClient webClient, ObjectMapper mapper, DateFormat format) {
         this.mapper = mapper.copy();
         this.dateFormat = format;
-        this.webClient = (webClient == null) ? buildWebClient(this.mapper) : webClient;
+        this.webClient = webClient;
         this.init();
     }
 
@@ -157,14 +165,17 @@ public class ApiClient{{#jsr310}} extends JavaTimeFormatter{{/jsr310}} {
     * Build the WebClient used to make HTTP requests.
     * @return WebClient
     */
-    public static WebClient buildWebClient(ObjectMapper mapper) {
+    private WebClient buildWebClient(WebClientCustomizer webClientCustomizer) {
         ExchangeStrategies strategies = ExchangeStrategies
             .builder()
             .codecs(clientDefaultCodecsConfigurer -> {
-                clientDefaultCodecsConfigurer.defaultCodecs().jackson2JsonEncoder(new Jackson2JsonEncoder(mapper, MediaType.APPLICATION_JSON));
-                clientDefaultCodecsConfigurer.defaultCodecs().jackson2JsonDecoder(new Jackson2JsonDecoder(mapper, MediaType.APPLICATION_JSON));
+                clientDefaultCodecsConfigurer.defaultCodecs().jackson2JsonEncoder(new Jackson2JsonEncoder(this.mapper, MediaType.APPLICATION_JSON));
+                clientDefaultCodecsConfigurer.defaultCodecs().jackson2JsonDecoder(new Jackson2JsonDecoder(this.mapper, MediaType.APPLICATION_JSON));
             }).build();
         WebClient.Builder webClient = WebClient.builder().exchangeStrategies(strategies);
+        if (webClientCustomizer != null) {
+            webClientCustomizer.customize(webClient);
+        }
         return webClient.build();
     }
 
