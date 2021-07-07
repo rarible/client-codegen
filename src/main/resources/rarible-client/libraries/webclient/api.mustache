@@ -127,22 +127,21 @@ public class {{classname}} {
         {{#returnType}}ParameterizedTypeReference<{{#isArray}}{{{returnBaseType}}}{{/isArray}}{{^isArray}}{{{returnType}}}{{/isArray}}> localVarReturnType = new ParameterizedTypeReference<{{#isArray}}{{{returnBaseType}}}{{/isArray}}{{^isArray}}{{{returnType}}}{{/isArray}}>() {};{{/returnType}}{{^returnType}}ParameterizedTypeReference<Void> localVarReturnType = new ParameterizedTypeReference<Void>() {};{{/returnType}}
         return apiClient.{{#isArray}}invokeFluxAPI{{/isArray}}{{^isArray}}invokeAPI{{/isArray}}("{{{path}}}", HttpMethod.{{httpMethod}}, pathParams, queryParams, postBody, headerParams, cookieParams, formParams, localVarAccept, localVarContentType, localVarAuthNames, localVarReturnType)
                 .onErrorResume(WebClientResponseException.class, e -> {
-                    Class dtoClass = null;
-                    int code = e.getStatusCode().value();
+                    Class definedDtoClass = null;
                     {{#responses}}
                     {{^is2xx}}
-                    if (code == {{code}}) dtoClass = {{dataType}}.class;
+                    if (e.getStatusCode().value() == {{code}}) definedDtoClass = {{#dataType}}{{dataType}}.class{{/dataType}}{{^dataType}}null{{/dataType}};
                     {{/is2xx}}
                     {{/responses}}
-                    if (dtoClass == null) throw e;
+                    if (definedDtoClass == null) throw e;
 
                     Object error;
                     try {
-                        error = apiClient.getObjectMapper().readValue(e.getResponseBodyAsByteArray(), dtoClass);
+                        error = apiClient.getObjectMapper().readValue(e.getResponseBodyAsByteArray(), definedDtoClass);
                     } catch (Exception ex) {
-                        throw new RuntimeException("Failed to map error response to DTO class " + dtoClass, ex);
+                        throw new RuntimeException("Failed to map error response to DTO class " + definedDtoClass, ex);
                     }
-                    throw new ProtocolApiResponseException("Server returned code " + code + ", check responseObject for details", e, error);
+                    throw new ProtocolApiResponseException("Server returned code " + e.getStatusCode().value() + ", check responseObject for details", e, error);
                 });
     }
     {{/operation}}
