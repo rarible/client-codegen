@@ -4,7 +4,6 @@ import {{invokerPackage}}.ApiClient;
 
 {{#imports}}import {{import}};
 {{/imports}}
-import com.rarible.protocol.client.exception.ProtocolApiResponseException;
 {{^fullJavaUtil}}
 
 import java.util.HashMap;
@@ -56,13 +55,13 @@ public class {{classname}} {
 {{#responses}}     * <p><b>{{code}}</b>{{#message}} - {{message}}{{/message}}
 {{/responses}}{{#allParams}}     * @param {{paramName}} {{description}}{{^description}}The {{paramName}} parameter{{/description}}
 {{/allParams}}{{#returnType}}     * @return {{returnType}}
-{{/returnType}}     * @throws WebClientResponseException if an error occurs while attempting to invoke the API
+{{/returnType}}     * @throws Error{{operationId}} if an error occurs while attempting to invoke the API
 {{#externalDocs}}
     * {{description}}
     * @see <a href="{{url}}">{{summary}} Documentation</a>
 {{/externalDocs}}
      */
-    public {{#returnType}}{{#isArray}}Flux<{{{returnBaseType}}}>{{/isArray}}{{^isArray}}Mono<{{{returnType}}}>{{/isArray}} {{/returnType}}{{^returnType}}Mono<Void> {{/returnType}}{{operationId}}({{#allParams}}{{#isFile}}{{#useAbstractionForFiles}}{{#collectionFormat}}java.util.Collection<org.springframework.core.io.AbstractResource>{{/collectionFormat}}{{^collectionFormat}}org.springframework.core.io.AbstractResource{{/collectionFormat}}{{/useAbstractionForFiles}}{{^useAbstractionForFiles}}{{{dataType}}}{{/useAbstractionForFiles}}{{/isFile}}{{^isFile}}{{{dataType}}}{{/isFile}} {{paramName}}{{^-last}}, {{/-last}}{{/allParams}}) throws WebClientResponseException {
+    public {{#returnType}}{{#isArray}}Flux<{{{returnBaseType}}}>{{/isArray}}{{^isArray}}Mono<{{{returnType}}}>{{/isArray}} {{/returnType}}{{^returnType}}Mono<Void> {{/returnType}}{{operationId}}({{#allParams}}{{#isFile}}{{#useAbstractionForFiles}}{{#collectionFormat}}java.util.Collection<org.springframework.core.io.AbstractResource>{{/collectionFormat}}{{^collectionFormat}}org.springframework.core.io.AbstractResource{{/collectionFormat}}{{/useAbstractionForFiles}}{{^useAbstractionForFiles}}{{{dataType}}}{{/useAbstractionForFiles}}{{/isFile}}{{^isFile}}{{{dataType}}}{{/isFile}} {{paramName}}{{^-last}}, {{/-last}}{{/allParams}}) throws Error{{#firstLetterUppercase}}{{operationId}}{{/firstLetterUppercase}} {
         Object postBody = {{#bodyParam}}{{paramName}}{{/bodyParam}}{{^bodyParam}}null{{/bodyParam}};
         {{#allParams}}
         {{#required}}
@@ -127,23 +126,64 @@ public class {{classname}} {
         {{#returnType}}ParameterizedTypeReference<{{#isArray}}{{{returnBaseType}}}{{/isArray}}{{^isArray}}{{{returnType}}}{{/isArray}}> localVarReturnType = new ParameterizedTypeReference<{{#isArray}}{{{returnBaseType}}}{{/isArray}}{{^isArray}}{{{returnType}}}{{/isArray}}>() {};{{/returnType}}{{^returnType}}ParameterizedTypeReference<Void> localVarReturnType = new ParameterizedTypeReference<Void>() {};{{/returnType}}
         return apiClient.{{#isArray}}invokeFluxAPI{{/isArray}}{{^isArray}}invokeAPI{{/isArray}}("{{{path}}}", HttpMethod.{{httpMethod}}, pathParams, queryParams, postBody, headerParams, cookieParams, formParams, localVarAccept, localVarContentType, localVarAuthNames, localVarReturnType)
                 .onErrorResume(WebClientResponseException.class, e -> {
-                    Class definedDtoClass = null;
-                    {{#responses}}
-                    {{^is2xx}}
-                    if (e.getStatusCode().value() == {{code}}) definedDtoClass = {{#dataType}}{{dataType}}.class{{/dataType}}{{^dataType}}null{{/dataType}};
-                    {{/is2xx}}
-                    {{/responses}}
-                    if (definedDtoClass == null) throw e;
-
-                    Object error;
+                    Error{{#firstLetterUppercase}}{{operationId}}{{/firstLetterUppercase}} result = new Error{{#firstLetterUppercase}}{{operationId}}{{/firstLetterUppercase}}(e);
                     try {
-                        error = apiClient.getObjectMapper().readValue(e.getResponseBodyAsByteArray(), definedDtoClass);
-                    } catch (Exception ex) {
-                        throw new RuntimeException("Failed to map error response to DTO class " + definedDtoClass, ex);
+                        {{#responses}}
+                        {{^is2xx}}
+                        if (e.getStatusCode().value() == {{code}}) result.on{{code}} = {{#dataType}}getErrorObject(e, {{dataType}}.class){{/dataType}}{{^dataType}}null{{/dataType}};
+                        {{/is2xx}}
+                        {{/responses}}
+                    } catch (Throwable ex) {
+                        result.unhandled = ex;
                     }
-                    throw new ProtocolApiResponseException("Server returned code " + e.getStatusCode().value() + ", check responseObject for details", e, error);
+                    throw result;
                 });
     }
+
+    public static class Error{{#firstLetterUppercase}}{{operationId}}{{/firstLetterUppercase}} extends WebClientResponseWrappedException {
+        {{#responses}}
+        {{^is2xx}}
+        {{#dataType}}{{dataType}} on{{code}}{{/dataType}}{{^dataType}}{{/dataType}};
+        {{/is2xx}}
+        {{/responses}}
+        public Error{{#firstLetterUppercase}}{{operationId}}{{/firstLetterUppercase}}(WebClientResponseException e) {
+            super(e);
+        }
+    }
+
     {{/operation}}
+
+    private <T> T getErrorObject(WebClientResponseException e, Class<T> type) {
+        if (type == null) {
+            return null;
+        }
+        Object error;
+        String content = e.getResponseBodyAsString();
+        try {
+            return apiClient.getObjectMapper().readValue(content, type);
+        } catch (Exception ex) {
+            throw new RuntimeException("Failed to map error response to DTO class " + type + ", body: " + content, ex);
+        }
+    }
+
+    private static class WebClientResponseWrappedException extends WebClientResponseException {
+
+        public Throwable unhandled;
+        private WebClientResponseException original;
+
+        public WebClientResponseWrappedException(WebClientResponseException e) {
+            super(e.getMessage(),
+                    e.getRawStatusCode(),
+                    e.getStatusText(),
+                    e.getHeaders(),
+                    e.getResponseBodyAsByteArray(),
+                    null,
+                    e.getRequest());
+        }
+
+        public String getResponseBodyAsString() {
+            return original.getResponseBodyAsString();
+        }
+    }
 }
 {{/operations}}
