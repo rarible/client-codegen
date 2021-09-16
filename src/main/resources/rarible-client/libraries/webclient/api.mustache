@@ -143,7 +143,7 @@ public class {{classname}} {
     public static class Error{{#firstLetterUppercase}}{{operationId}}{{/firstLetterUppercase}} extends WebClientResponseWrappedException {
         {{#responses}}
         {{^is2xx}}
-        {{#dataType}}{{dataType}} on{{code}}{{/dataType}}{{^dataType}}{{/dataType}};
+        {{#dataType}}public {{dataType}} on{{code}}{{/dataType}}{{^dataType}}{{/dataType}};
         {{/is2xx}}
         {{/responses}}
         public Error{{#firstLetterUppercase}}{{operationId}}{{/firstLetterUppercase}}(WebClientResponseException e) {
