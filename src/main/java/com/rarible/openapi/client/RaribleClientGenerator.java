@@ -3,6 +3,7 @@ package com.rarible.openapi.client;
 import org.openapitools.codegen.CodegenConfig;
 import org.openapitools.codegen.languages.JavaClientCodegen;
 import org.openapitools.codegen.languages.KotlinSpringServerCodegen;
+import org.openapitools.codegen.templating.mustache.CamelCaseLambda;
 
 import java.util.stream.Collectors;
 
@@ -26,6 +27,7 @@ public class RaribleClientGenerator extends JavaClientCodegen implements Codegen
     setModelNameSuffix("Dto");
     setUseBeanValidation(false);
     setOpenApiNullable(false);
+    additionalProperties().put("firstLetterUppercase", new CamelCaseLambda(false));
   }
 
   @Override
