@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 {{/fullJavaUtil}}
 
+import com.rarible.core.client.WebClientResponseProxyException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -130,17 +131,20 @@ public class {{classname}} {
                     try {
                         {{#responses}}
                         {{^is2xx}}
-                        if (e.getStatusCode().value() == {{code}}) result.on{{code}} = {{#dataType}}getErrorObject(e, {{dataType}}.class){{/dataType}}{{^dataType}}null{{/dataType}};
+                        if (e.getStatusCode().value() == {{code}}) {
+                             result.on{{code}} = {{#dataType}}getErrorObject(e, {{dataType}}.class){{/dataType}}{{^dataType}}null{{/dataType}};
+                             result.setData(result.on{{code}});
+                        }
                         {{/is2xx}}
                         {{/responses}}
                     } catch (Throwable ex) {
-                        result.unhandled = ex;
+                        result.setUnhandled(ex);
                     }
                     throw result;
                 });
     }
 
-    public static class Error{{#firstLetterUppercase}}{{operationId}}{{/firstLetterUppercase}} extends WebClientResponseWrappedException {
+    public static class Error{{#firstLetterUppercase}}{{operationId}}{{/firstLetterUppercase}} extends WebClientResponseProxyException {
         {{#responses}}
         {{^is2xx}}
         {{#dataType}}public {{dataType}} on{{code}}{{/dataType}}{{^dataType}}{{/dataType}};
@@ -150,7 +154,6 @@ public class {{classname}} {
             super(e);
         }
     }
-
     {{/operation}}
 
     private <T> T getErrorObject(WebClientResponseException e, Class<T> type) {
@@ -163,26 +166,6 @@ public class {{classname}} {
             return apiClient.getObjectMapper().readValue(content, type);
         } catch (Exception ex) {
             throw new RuntimeException("Failed to map error response to DTO class " + type + ", body: " + content, ex);
-        }
-    }
-
-    private static class WebClientResponseWrappedException extends WebClientResponseException {
-
-        public Throwable unhandled;
-        private WebClientResponseException original;
-
-        public WebClientResponseWrappedException(WebClientResponseException e) {
-            super(e.getMessage(),
-                    e.getRawStatusCode(),
-                    e.getStatusText(),
-                    e.getHeaders(),
-                    e.getResponseBodyAsByteArray(),
-                    null,
-                    e.getRequest());
-        }
-
-        public String getResponseBodyAsString() {
-            return original.getResponseBodyAsString();
         }
     }
 }
