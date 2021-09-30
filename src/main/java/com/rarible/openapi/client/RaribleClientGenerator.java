@@ -33,6 +33,7 @@ public class RaribleClientGenerator extends JavaClientCodegen {
         super.processOpts();
         supportingFiles = supportingFiles.stream().filter(it -> !it.getTemplateFile().toLowerCase().contains("gradle")).collect(Collectors.toList());
         typeMapping.put("OffsetDateTime", "Instant");
+        typeMapping.put("java.time.OffsetDateTime", "java.time.Instant");
         importMapping.put("OffsetDateTime", "java.time.Instant");
         importMapping.put("Address", "scalether.domain.Address");
         importMapping.put("Word", "io.daonomic.rpc.domain.Word");
