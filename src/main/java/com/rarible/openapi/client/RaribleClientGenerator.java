@@ -1,12 +1,12 @@
 package com.rarible.openapi.client;
 
 import io.swagger.v3.oas.models.OpenAPI;
-import io.swagger.v3.oas.models.Operation;
-import io.swagger.v3.oas.models.PathItem;
+import io.swagger.v3.oas.models.tags.Tag;
 import org.openapitools.codegen.languages.JavaClientCodegen;
 import org.openapitools.codegen.templating.mustache.CamelCaseLambda;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -29,22 +29,15 @@ public class RaribleClientGenerator extends JavaClientCodegen {
 
     @Override
     public void preprocessOpenAPI(OpenAPI openAPI) {
-        for (PathItem path : openAPI.getPaths().values()) {
-            for (Operation operation : path.readOperations()) {
-                Map<String, Object> extensions = operation.getExtensions();
-                if (extensions == null || !extensions.containsKey(X_CONTROLLER)) {
-                    continue;
-                }
-                String controller = extensions.get(X_CONTROLLER).toString();
-                for (String tag : operation.getTags()) {
-                    String exists = tagMapping.get(tag);
-                    if (exists != null && !controller.equals(exists)) {
-                        throw new IllegalArgumentException("'x-controller' value for operation "
-                                + operation.getOperationId() + " with tag " + tag + " set as '" + operation + "' "
-                                + "but this tag already mapped to controller with name '" + exists + "'");
-                    }
-                    tagMapping.put(tag, controller);
-                }
+        super.preprocessOpenAPI(openAPI);
+        List<Tag> tags = openAPI.getTags();
+        if (tags == null) {
+            return;
+        }
+        for (Tag tag : tags) {
+            Map<String, Object> extensions = tag.getExtensions();
+            if (extensions != null && extensions.containsKey(X_CONTROLLER)) {
+                tagMapping.put(tag.getName(), extensions.get(X_CONTROLLER).toString());
             }
         }
     }
